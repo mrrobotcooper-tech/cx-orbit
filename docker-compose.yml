@@ -1,0 +1,249 @@
+# =====================================================================
+# CX-ORBIT — Local infrastructure stack (Phase 1)
+#
+# Brings up the datastores, event bus and observability stack that the
+# platform services (Phases 3+) depend on. Application services are added
+# to this file as they are implemented.
+#
+#   Start:   docker compose up -d
+#   Health:  docker compose ps
+#   Logs:    docker compose logs -f <service>
+#   Stop:    docker compose down            (add -v to wipe volumes)
+#
+# Ports and credentials come from .env (see .env.example). Every value
+# has a sane default so `docker compose up` works even without a .env.
+# =====================================================================
+
+name: cx-orbit
+
+# ---- Reusable snippets -------------------------------------------------
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+networks:
+  cxorbit:
+    driver: bridge
+
+volumes:
+  mongo-data:
+  postgres-data:
+  redis-data:
+  nats-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+
+services:
+  # ===================================================================
+  # DATASTORES
+  # ===================================================================
+
+  mongo:
+    image: mongo:7
+    container_name: cxorbit-mongo
+    restart: unless-stopped
+    # Single-node replica set: required for multi-document ACID transactions,
+    # which the Conversation Service needs for the transactional Outbox (ADR-005).
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
+    ports:
+      - '${MONGO_PORT:-27017}:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Idempotently initiate the replica set on first boot, then report healthy
+      # only once this node is a writable primary.
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--quiet',
+          '--eval',
+          "try { rs.status() } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}) } quit(db.hello().isWritablePrimary ? 0 : 1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [cxorbit]
+    logging: *default-logging
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cxorbit-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cxorbit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cxorbit}
+      POSTGRES_DB: ${POSTGRES_DB:-cxorbit}
+    ports:
+      # Host port is separate from the internal port so a local Postgres on
+      # 5432 doesn't collide. Services connect in-network to postgres:5432.
+      - '${POSTGRES_HOST_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-cxorbit} -d ${POSTGRES_DB:-cxorbit}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [cxorbit]
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    container_name: cxorbit-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [cxorbit]
+    logging: *default-logging
+
+  # ===================================================================
+  # EVENT BUS — NATS JetStream (see ADR-001)
+  # ===================================================================
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: cxorbit-nats
+    restart: unless-stopped
+    # -js  : enable JetStream (persistence)
+    # -sd  : JetStream storage dir
+    # -m   : HTTP monitoring port
+    command: ['-js', '-sd', '/data', '-m', '8222']
+    ports:
+      - '${NATS_PORT:-4222}:4222' # client connections
+      - '${NATS_MONITOR_PORT:-8222}:8222' # monitoring / healthz
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      # NATS ships wget in the alpine image; hit the healthz endpoint.
+      test: ['CMD-SHELL', 'wget -q -O - http://localhost:8222/healthz | grep -q ok']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [cxorbit]
+    logging: *default-logging
+
+  # ===================================================================
+  # OBSERVABILITY — Prometheus / Grafana / Loki / Promtail
+  # ===================================================================
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: cxorbit-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    ports:
+      - '${PROMETHEUS_PORT:-9090}:9090'
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O - http://localhost:9090/-/healthy | grep -q Healthy']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [cxorbit]
+    logging: *default-logging
+
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: cxorbit-loki
+    restart: unless-stopped
+    command: ['-config.file=/etc/loki/loki-config.yml']
+    ports:
+      - '${LOKI_PORT:-3100}:3100'
+    volumes:
+      - ./infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O - http://localhost:3100/ready | grep -q ready']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [cxorbit]
+    logging: *default-logging
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    container_name: cxorbit-promtail
+    restart: unless-stopped
+    command: ['-config.file=/etc/promtail/promtail-config.yml']
+    volumes:
+      - ./infra/loki/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      loki:
+        condition: service_started
+    networks: [cxorbit]
+    logging: *default-logging
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: cxorbit-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: 'Viewer'
+    ports:
+      - '${GRAFANA_PORT:-3001}:3000'
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O - http://localhost:3000/api/health | grep -q ok']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [cxorbit]
+    logging: *default-logging
+
+  # ===================================================================
+  # OPTIONAL — OpenTelemetry Collector (enable with: --profile tracing)
+  # ===================================================================
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: cxorbit-otel-collector
+    restart: unless-stopped
+    profiles: ['tracing']
+    command: ['--config=/etc/otel/otel-collector-config.yml']
+    ports:
+      - '4317:4317' # OTLP gRPC
+      - '4318:4318' # OTLP HTTP
+    volumes:
+      - ./infra/otel/otel-collector-config.yml:/etc/otel/otel-collector-config.yml:ro
+    networks: [cxorbit]
+    logging: *default-logging

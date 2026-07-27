@@ -1,0 +1,70 @@
+# =====================================================================
+# CX-ORBIT — Prometheus scrape configuration (Phase 1)
+#
+# Prometheus scrapes itself now. The application-service jobs below are
+# declared ahead of time so dashboards work as services come online in
+# later phases. Targets that don't exist yet simply show as "down" —
+# this is expected until the corresponding phase is implemented.
+# =====================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    platform: cx-orbit
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ---- Application services (exposed at /metrics on port 8080..8087) ----
+  # These come online in later phases; kept here so Grafana dashboards
+  # are ready immediately.
+  - job_name: channel-gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['channel-gateway:8080']
+        labels: { service: channel-gateway }
+
+  - job_name: conversation-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['conversation-service:8081']
+        labels: { service: conversation-service }
+
+  - job_name: customer-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['customer-service:8082']
+        labels: { service: customer-service }
+
+  - job_name: ai-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['ai-service:8083']
+        labels: { service: ai-service }
+
+  - job_name: routing-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['routing-service:8084']
+        labels: { service: routing-service }
+
+  - job_name: outbound-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['outbound-service:8085']
+        labels: { service: outbound-service }
+
+  - job_name: analytics-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['analytics-service:8086']
+        labels: { service: analytics-service }
+
+  - job_name: incident-simulator
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['incident-simulator:8087']
+        labels: { service: incident-simulator }

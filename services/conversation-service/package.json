@@ -1,0 +1,29 @@
+{
+  "name": "@cx-orbit/conversation-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CX-ORBIT Conversation Service: system of record for conversations & messages, with the transactional Outbox pattern.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.spec.json",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@cx-orbit/platform": "workspace:*",
+    "@cx-orbit/shared": "workspace:*",
+    "fastify": "^5.2.1",
+    "mongodb": "^6.12.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8"
+  }
+}

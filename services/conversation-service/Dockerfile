@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+# Multi-stage build for the Conversation Service inside the pnpm monorepo.
+# Build from the REPOSITORY ROOT as context:
+#   docker build -f services/conversation-service/Dockerfile -t cxorbit/conversation-service .
+
+FROM node:22-alpine AS base
+ENV PNPM_HOME="/pnpm" PATH="/pnpm:$PATH"
+RUN corepack enable
+WORKDIR /app
+
+FROM base AS build
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
+COPY packages ./packages
+COPY services ./services
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @cx-orbit/shared build \
+  && pnpm --filter @cx-orbit/platform build \
+  && pnpm --filter @cx-orbit/conversation-service build
+RUN pnpm --filter @cx-orbit/conversation-service deploy --prod /app/deploy
+
+FROM base AS runtime
+ENV NODE_ENV=production
+COPY --from=build /app/deploy ./
+EXPOSE 8081
+CMD ["node", "dist/index.js"]

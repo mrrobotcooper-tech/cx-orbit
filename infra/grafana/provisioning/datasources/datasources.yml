@@ -1,0 +1,23 @@
+# =====================================================================
+# CX-ORBIT — Grafana datasource provisioning (Phase 1)
+# =====================================================================
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: cxorbit-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+
+  - name: Loki
+    uid: cxorbit-loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000

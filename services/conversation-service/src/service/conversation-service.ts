@@ -161,6 +161,10 @@ export function createConversationService(deps: ConversationServiceDeps) {
                 changes: {
                   lastMessageId: messageId,
                   direction: 'inbound',
+                  // Text snippet for downstream AI (stateless; avoids a sync HTTP hop).
+                  ...(msg.content.type === 'text' && msg.content.text !== undefined
+                    ? { text: msg.content.text }
+                    : {}),
                 },
               },
               trace,
@@ -190,7 +194,7 @@ export function createConversationService(deps: ConversationServiceDeps) {
     return { status: 'processed', ...(conversationId ? { conversationId } : {}) };
   }
 
-  /** Consume `routing.completed`: apply the routing decision to the conversation. */
+  /** Consume `routing.completed`: apply the routing decision and request an outbound reply. */
   async function handleRoutingCompleted(event: EventEnvelope<'routing.completed'>): Promise<void> {
     const p = event.payload;
     const trace: TraceContext = {
@@ -203,7 +207,19 @@ export function createConversationService(deps: ConversationServiceDeps) {
     try {
       await session.withTransaction(async () => {
         const now = new Date();
-        const res = await collections.conversations.updateOne(
+        const conversation = await collections.conversations.findOne(
+          { _id: p.conversationId },
+          { session },
+        );
+        if (!conversation) {
+          logger.warn(
+            { conversationId: p.conversationId },
+            'routing.completed for unknown conversation',
+          );
+          return;
+        }
+
+        await collections.conversations.updateOne(
           { _id: p.conversationId },
           {
             $set: {
@@ -215,14 +231,8 @@ export function createConversationService(deps: ConversationServiceDeps) {
           },
           { session },
         );
-        if (res.matchedCount === 0) {
-          logger.warn(
-            { conversationId: p.conversationId },
-            'routing.completed for unknown conversation',
-          );
-          return;
-        }
-        await collections.outbox.insertOne(
+
+        const outboxDocs: OutboxDoc[] = [
           toOutboxDoc(
             makeEvent(
               'conversation.assigned',
@@ -231,8 +241,36 @@ export function createConversationService(deps: ConversationServiceDeps) {
             ),
             now,
           ),
-          { session },
+        ];
+
+        // Auto-reply so the Outbound Service can demonstrate reliable egress (Phase 8).
+        const lastInbound = await collections.messages.findOne(
+          { conversationId: p.conversationId, direction: 'inbound' },
+          { sort: { createdAt: -1 }, session },
         );
+        if (lastInbound) {
+          const text = p.handoffToHuman
+            ? `Te estamos conectando con un agente del equipo ${p.assignedTeam}.`
+            : `Gracias, tu consulta fue asignada al equipo ${p.assignedTeam} (prioridad ${p.priority}).`;
+          outboxDocs.push(
+            toOutboxDoc(
+              makeEvent(
+                'message.send.requested',
+                {
+                  conversationId: p.conversationId,
+                  channel: conversation.channel,
+                  recipientExternalId: lastInbound.sender.externalId,
+                  content: { type: 'text', text },
+                  idempotencyKey: `send:${p.conversationId}:${event.eventId}`,
+                },
+                trace,
+              ),
+              now,
+            ),
+          );
+        }
+
+        await collections.outbox.insertMany(outboxDocs, { session });
       });
     } finally {
       await session.endSession();

@@ -1,0 +1,182 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "title": "Messages (inbound / outbound)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "cxorbit-prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(analytics_messages_total{direction=\"inbound\"}[5m]))",
+          "legendFormat": "inbound/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(analytics_messages_total{direction=\"outbound\"}[5m]))",
+          "legendFormat": "outbound/s",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Conversations created",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "cxorbit-prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(analytics_conversations_created_total[5m])) by (channel)",
+          "legendFormat": "{{channel}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Handoff rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "cxorbit-prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.3 },
+              { "color": "red", "value": 0.6 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(analytics_routing_decisions_total{handoff=\"true\"}) / clamp_min(sum(analytics_routing_decisions_total), 1)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "AI containment rate",
+      "description": "1 - (low confidence / all analyses). Higher is better.",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "cxorbit-prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "green", "value": 0.8 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "1 - (sum(analytics_ai_low_confidence_total) / clamp_min(sum(analytics_ai_analyses_total), 1))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Delivery success rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "cxorbit-prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.8 },
+              { "color": "green", "value": 0.95 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(analytics_delivery_results_total{result=\"sent\"}) / clamp_min(sum(analytics_delivery_results_total), 1)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Consumer lag (technical)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "cxorbit-prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 200 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "analytics_consumer_lag",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Events consumed by type",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "cxorbit-prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(analytics_events_consumed_total[5m])) by (type)",
+          "legendFormat": "{{type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Routing by team",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "cxorbit-prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(analytics_routing_decisions_total[5m])) by (team)",
+          "legendFormat": "{{team}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["cx-orbit", "business", "analytics"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "CX-ORBIT Business Analytics",
+  "uid": "cxorbit-business",
+  "version": 1
+}

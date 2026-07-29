@@ -1,5 +1,6 @@
 import {
   connectEventBus,
+  createFaultStore,
   createIdempotencyStore,
   createLogger,
   createMetrics,
@@ -21,13 +22,14 @@ async function main(): Promise<void> {
   const metrics = createMetrics(SERVICE);
   const domainMetrics = createAiMetrics(metrics.registry);
 
-  const provider = createAIProvider(config);
+  const redis = createRedis({ url: config.REDIS_URL });
+  const faults = createFaultStore(redis);
+  const provider = createAIProvider(config, faults);
   logger.info(
     { provider: provider.name, forceFailure: config.AI_FORCE_FAILURE },
     'AI provider selected',
   );
 
-  const redis = createRedis({ url: config.REDIS_URL });
   const idempotency = createIdempotencyStore(redis, {
     defaultTtlSeconds: config.IDEMPOTENCY_TTL_SECONDS,
   });

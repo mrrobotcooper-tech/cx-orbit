@@ -1,7 +1,11 @@
 import type { Channel } from '@cx-orbit/shared';
 import type { OutboundAdapter, SendMessageInput, SendMessageResult } from './types.js';
 import { ProviderDeliveryError } from './types.js';
-import { createWebChatAdapter, type WebChatAdapterOptions } from './webchat.js';
+import {
+  createWebChatAdapter,
+  type WebChatAdapterOptions,
+  type WebChatSimulateFault,
+} from './webchat.js';
 
 /** Stub for channels without a local simulator yet. */
 function stubAdapter(channel: Channel): OutboundAdapter {
@@ -36,4 +40,4 @@ export function createOutboundAdapters(
 }
 
 export * from './types.js';
-export { createWebChatAdapter };
+export { createWebChatAdapter, type WebChatSimulateFault };

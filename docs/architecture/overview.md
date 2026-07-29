@@ -3,7 +3,7 @@
 > **Audience:** engineers and interviewers who want to understand how CX-ORBIT is designed, why the
 > boundaries are where they are, and how a message flows end-to-end.
 >
-> **Status:** Phase 0 (design). This document describes the _target_ architecture; implementation lands
+> **Status:** Phase 14 — architecture as implemented. Historical design notes remain; implementation lands
 > incrementally per the [roadmap](../development/roadmap.md).
 
 ---

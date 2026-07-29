@@ -11,6 +11,11 @@ import {
 export interface MockAIProviderOptions {
   /** Injected failure mode (from env or tests). */
   forceFailure?: AiFailureMode;
+  /**
+   * Dynamic failure mode resolver (Redis fault flags from Incident Simulator).
+   * Wins over `forceFailure` when it returns a non-NONE value.
+   */
+  getForceFailure?: () => Promise<AiFailureMode> | AiFailureMode;
   /** Artificial delay for TIMEOUT simulation, in ms. Default 50. */
   timeoutDelayMs?: number;
 }
@@ -24,10 +29,17 @@ function sleep(ms: number): Promise<void> {
  * failure modes are injectable for incident simulation and unit tests.
  */
 export function createMockAIProvider(options: MockAIProviderOptions = {}): AIProvider {
-  const force = options.forceFailure ?? 'NONE';
   const timeoutDelayMs = options.timeoutDelayMs ?? 50;
 
-  async function maybeFail(stage: string): Promise<void> {
+  async function resolveForce(): Promise<AiFailureMode> {
+    if (options.getForceFailure) {
+      const dynamic = await options.getForceFailure();
+      if (dynamic !== 'NONE') return dynamic;
+    }
+    return options.forceFailure ?? 'NONE';
+  }
+
+  async function maybeFail(stage: string, force: AiFailureMode): Promise<void> {
     switch (force) {
       case 'TIMEOUT':
         await sleep(timeoutDelayMs);
@@ -45,7 +57,8 @@ export function createMockAIProvider(options: MockAIProviderOptions = {}): AIPro
     name: 'mock',
 
     async classifyIntent(input: string): Promise<IntentResult> {
-      await maybeFail('classifyIntent');
+      const force = await resolveForce();
+      await maybeFail('classifyIntent', force);
       if (force === 'INVALID_JSON') {
         return { intent: '', confidence: 2 } as unknown as IntentResult;
       }
@@ -78,7 +91,8 @@ export function createMockAIProvider(options: MockAIProviderOptions = {}): AIPro
     },
 
     async analyzeSentiment(input: string): Promise<SentimentResult> {
-      await maybeFail('analyzeSentiment');
+      const force = await resolveForce();
+      await maybeFail('analyzeSentiment', force);
       if (force === 'INVALID_JSON') {
         return { sentiment: 'angry', confidence: -1 } as unknown as SentimentResult;
       }
@@ -97,7 +111,8 @@ export function createMockAIProvider(options: MockAIProviderOptions = {}): AIPro
     },
 
     async extractEntities(input: string): Promise<EntityResult> {
-      await maybeFail('extractEntities');
+      const force = await resolveForce();
+      await maybeFail('extractEntities', force);
       if (force === 'INVALID_JSON') {
         return { entities: 'not-an-object', confidence: 1 } as unknown as EntityResult;
       }
@@ -112,7 +127,8 @@ export function createMockAIProvider(options: MockAIProviderOptions = {}): AIPro
     },
 
     async summarizeConversation(messages: string[]): Promise<SummaryResult> {
-      await maybeFail('summarizeConversation');
+      const force = await resolveForce();
+      await maybeFail('summarizeConversation', force);
       if (force === 'INVALID_JSON') {
         return { summary: '', confidence: 5 } as unknown as SummaryResult;
       }

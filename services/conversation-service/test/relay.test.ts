@@ -1,4 +1,4 @@
-import { Registry } from '@cx-orbit/platform';
+import { FAULT_KEYS, Registry, type FaultStore } from '@cx-orbit/platform';
 import { createLogger } from '@cx-orbit/platform';
 import { type AnyEvent, createEvent } from '@cx-orbit/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -8,6 +8,24 @@ import { createConversationMetrics } from '../src/metrics.js';
 import { createOutboxRelay } from '../src/outbox/relay.js';
 
 const logger = createLogger({ service: 'relay-test', level: 'silent' });
+
+function memoryFaults(initial: Record<string, string> = {}): FaultStore {
+  const store = new Map(Object.entries(initial));
+  return {
+    async get(key) {
+      return store.get(key) ?? null;
+    },
+    async set(key, value) {
+      store.set(key, value);
+    },
+    async del(key) {
+      store.delete(key);
+    },
+    async clearAll() {
+      store.clear();
+    },
+  };
+}
 
 /** Minimal in-memory stand-in for the outbox collection used by the relay. */
 function fakeOutbox(docs: OutboxDoc[]) {
@@ -99,6 +117,43 @@ describe('outbox relay', () => {
     const second = await relay.pump();
 
     expect(second).toBe(0);
+    expect(published).toHaveLength(1);
+  });
+
+  it('skips publish while OUTBOX_DROP fault is active (INC-006)', async () => {
+    const docs = [pendingDoc('evt_drop')];
+    const collections = { outbox: fakeOutbox(docs) } as unknown as Collections;
+    const faults = memoryFaults({ [FAULT_KEYS.OUTBOX_DROP]: '1' });
+    const relay = createOutboxRelay(fakeBus(published) as never, collections, metrics, logger, {
+      faults,
+    });
+
+    const count = await relay.pump();
+    expect(count).toBe(0);
+    expect(published).toHaveLength(0);
+    expect(docs[0]?.status).toBe('pending');
+  });
+
+  it('retries later after a publish failure (event retry)', async () => {
+    const docs = [pendingDoc('evt_retry')];
+    const collections = { outbox: fakeOutbox(docs) } as unknown as Collections;
+    let attempts = 0;
+    const flakyBus = {
+      async publish(event: AnyEvent) {
+        attempts += 1;
+        if (attempts === 1) throw new Error('nats unavailable');
+        published.push(event);
+        return { seq: published.length, duplicate: false };
+      },
+    };
+    const relay = createOutboxRelay(flakyBus as never, collections, metrics, logger);
+
+    expect(await relay.pump()).toBe(0);
+    expect(docs[0]?.status).toBe('pending');
+    expect(docs[0]?.attempts).toBe(1);
+
+    expect(await relay.pump()).toBe(1);
+    expect(docs[0]?.status).toBe('published');
     expect(published).toHaveLength(1);
   });
 });

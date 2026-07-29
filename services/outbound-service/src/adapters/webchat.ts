@@ -1,16 +1,30 @@
 import type { OutboundAdapter, SendMessageInput, SendMessageResult } from './types.js';
 import { ProviderDeliveryError } from './types.js';
 
+export type WebChatSimulateFault = 'none' | 'timeout' | 'error' | 'rate_limit';
+
 export interface WebChatAdapterOptions {
   baseUrl: string;
   /** Injected into simulator via x-simulate-fault header. */
-  simulateFault?: 'none' | 'timeout' | 'error' | 'rate_limit';
+  simulateFault?: WebChatSimulateFault;
+  /**
+   * Dynamic fault resolver (Redis flags from Incident Simulator).
+   * Wins over `simulateFault` when it returns a non-none value.
+   */
+  getSimulateFault?: () => Promise<WebChatSimulateFault> | WebChatSimulateFault;
   fetchImpl?: typeof fetch;
 }
 
 export function createWebChatAdapter(options: WebChatAdapterOptions): OutboundAdapter {
   const fetchImpl = options.fetchImpl ?? fetch;
-  const fault = options.simulateFault ?? 'none';
+
+  async function resolveFault(): Promise<WebChatSimulateFault> {
+    if (options.getSimulateFault) {
+      const dynamic = await options.getSimulateFault();
+      if (dynamic !== 'none') return dynamic;
+    }
+    return options.simulateFault ?? 'none';
+  }
 
   return {
     channel: 'webchat',
@@ -19,6 +33,7 @@ export function createWebChatAdapter(options: WebChatAdapterOptions): OutboundAd
         throw new ProviderDeliveryError('webchat only supports text', 'INVALID_RECIPIENT', false);
       }
 
+      const fault = await resolveFault();
       const headers: Record<string, string> = { 'content-type': 'application/json' };
       if (fault !== 'none') headers['x-simulate-fault'] = fault;
 

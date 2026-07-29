@@ -1,7 +1,6 @@
 # Runbooks
 
-> **Status:** Phase 0 (index only). Full runbooks are authored alongside their incidents (Phase 10) and
-> finalized in Phase 14.
+> **Status:** Phase 10 — core incident runbooks authored. Phase 14 may deepen interview walkthroughs.
 
 A runbook is an operational playbook for responding to a symptom **fast**, before root-causing. Every runbook
 answers the same six questions:

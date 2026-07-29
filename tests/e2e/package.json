@@ -1,0 +1,21 @@
+{
+  "name": "@cx-orbit/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CX-ORBIT end-to-end pipeline tests (opt-in with RUN_E2E=1).",
+  "scripts": {
+    "test": "vitest run",
+    "test:unit": "vitest run --passWithNoTests",
+    "test:e2e": "RUN_E2E=1 vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@cx-orbit/whatsapp-provider": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

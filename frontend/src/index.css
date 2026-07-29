@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #0c1b2a;
+  --paper: #eef3f6;
+  --teal: #0d7377;
+  --signal: #d97706;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: 'Figtree', sans-serif;
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(1200px 600px at 10% -10%, rgba(13, 115, 119, 0.14), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(217, 119, 6, 0.1), transparent 50%),
+    linear-gradient(180deg, #f7fafc 0%, #e8eef3 100%),
+    linear-gradient(rgba(12, 27, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(12, 27, 42, 0.035) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    auto,
+    28px 28px,
+    28px 28px;
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(13, 115, 119, 0.22);
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-ink/10 bg-paper-raised/90 shadow-panel backdrop-blur-sm;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-teal text-white hover:bg-teal-deep;
+  }
+
+  .btn-ghost {
+    @apply btn border border-ink/15 bg-white/70 text-ink hover:border-teal/40 hover:bg-teal-mist/40;
+  }
+
+  .btn-danger {
+    @apply btn bg-danger text-white hover:bg-danger/90;
+  }
+
+  .btn-signal {
+    @apply btn bg-signal text-white hover:bg-signal/90;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-md px-2 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide;
+  }
+}

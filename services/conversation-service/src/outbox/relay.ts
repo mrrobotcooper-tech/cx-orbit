@@ -1,10 +1,12 @@
-import type { EventBus, Logger } from '@cx-orbit/platform';
+import { FAULT_KEYS, type EventBus, type FaultStore, type Logger } from '@cx-orbit/platform';
 import type { Collections } from '../db/collections.js';
 import type { ConversationMetrics } from '../metrics.js';
 
 export interface OutboxRelayOptions {
   pollIntervalMs?: number;
   batchSize?: number;
+  /** Phase 10: when OUTBOX_DROP fault is set, skip publish (simulates event loss). */
+  faults?: FaultStore;
 }
 
 export interface OutboxRelay {
@@ -31,6 +33,7 @@ export function createOutboxRelay(
 ): OutboxRelay {
   const pollIntervalMs = options.pollIntervalMs ?? 500;
   const batchSize = options.batchSize ?? 50;
+  const faults = options.faults;
 
   let timer: NodeJS.Timeout | undefined;
   let running = false;
@@ -42,6 +45,16 @@ export function createOutboxRelay(
     pumping = true;
     let published = 0;
     try {
+      if (faults && (await faults.get(FAULT_KEYS.OUTBOX_DROP)) === '1') {
+        const remaining = await collections.outbox.countDocuments({ status: 'pending' });
+        metrics.outboxPending.set(remaining);
+        logger.warn(
+          { pending: remaining },
+          'outbox drop fault active; skipping publish (INC-006)',
+        );
+        return 0;
+      }
+
       const pending = await collections.outbox
         .find({ status: 'pending' })
         .sort({ createdAt: 1 })

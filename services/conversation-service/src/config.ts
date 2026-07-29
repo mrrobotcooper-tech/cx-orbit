@@ -15,6 +15,7 @@ export const envSchema = baseEnvSchema.extend({
 
   NATS_URL: z.string().default('nats://localhost:4222'),
   NATS_STREAM: z.string().default('CXORBIT'),
+  REDIS_URL: z.string().default('redis://localhost:6379'),
 
   CONSUMER_DURABLE: z.string().default('conversation-service'),
   CONSUMER_MAX_DELIVER: z.coerce.number().int().positive().default(5),

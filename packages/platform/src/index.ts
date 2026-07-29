@@ -17,3 +17,4 @@ export * from './cache/idempotency.js';
 export * from './db/mongo.js';
 export * from './db/postgres.js';
 export * from './resilience/index.js';
+export * from './faults.js';

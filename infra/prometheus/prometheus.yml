@@ -18,9 +18,23 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # ---- Application services (exposed at /metrics on port 8080..8087) ----
-  # These come online in later phases; kept here so Grafana dashboards
-  # are ready immediately.
+  # Host-run services (pnpm --filter ... dev). Requires prometheus
+  # extra_hosts: host.docker.internal:host-gateway (see docker-compose.yml).
+  - job_name: host-services
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - 'host.docker.internal:8080'
+          - 'host.docker.internal:8081'
+          - 'host.docker.internal:8082'
+          - 'host.docker.internal:8083'
+          - 'host.docker.internal:8084'
+          - 'host.docker.internal:8085'
+          - 'host.docker.internal:8086'
+          - 'host.docker.internal:8087'
+        labels: { scrape: host }
+
+  # ---- Application services (when later added to compose) ----
   - job_name: channel-gateway
     metrics_path: /metrics
     static_configs:

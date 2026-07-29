@@ -1,5 +1,7 @@
 import {
+  FAULT_KEYS,
   type ClientSession,
+  type FaultStore,
   type Logger,
   type MongoClient,
   isDuplicateKeyError,
@@ -35,6 +37,12 @@ export interface ConversationServiceDeps {
   logger: Logger;
   /** Nudged after a successful commit so the outbox relay can publish promptly. */
   notifyOutbox?: () => void;
+  /** Phase 10: Redis fault flags (DATABASE_LATENCY). */
+  faults?: FaultStore;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 interface TraceContext {
@@ -47,7 +55,7 @@ function toOutboxDoc(event: AnyEvent, now: Date): OutboxDoc {
 }
 
 export function createConversationService(deps: ConversationServiceDeps) {
-  const { client, collections, metrics, logger } = deps;
+  const { client, collections, metrics, logger, faults } = deps;
 
   function makeEvent<T extends EventType>(
     eventType: T,
@@ -63,6 +71,16 @@ export function createConversationService(deps: ConversationServiceDeps) {
       correlationId: trace.correlationId,
       traceId: trace.traceId,
     }) as unknown as AnyEvent;
+  }
+
+  async function maybeDbLatency(): Promise<void> {
+    if (!faults) return;
+    const raw = await faults.get(FAULT_KEYS.DB_LATENCY_MS);
+    if (!raw) return;
+    const ms = Number(raw);
+    if (!Number.isFinite(ms) || ms <= 0) return;
+    logger.warn({ latencyMs: ms }, 'db latency fault active (INC-004)');
+    await sleep(ms);
   }
 
   async function findActiveConversation(
@@ -83,6 +101,8 @@ export function createConversationService(deps: ConversationServiceDeps) {
   async function handleMessageReceived(
     event: EventEnvelope<'message.received'>,
   ): Promise<{ status: 'processed' | 'duplicate'; conversationId?: string }> {
+    await maybeDbLatency();
+
     const msg = event.payload;
     const trace: TraceContext = {
       correlationId: event.correlationId,

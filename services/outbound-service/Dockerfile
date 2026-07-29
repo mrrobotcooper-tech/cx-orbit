@@ -9,6 +9,8 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 COPY packages ./packages
 COPY services ./services
 COPY simulators ./simulators
+COPY frontend ./frontend
+COPY tests ./tests
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @cx-orbit/shared build \
   && pnpm --filter @cx-orbit/platform build \

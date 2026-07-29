@@ -9,7 +9,7 @@ Legend: 🟡 in progress · ⬜ planned · ✅ done
 
 ---
 
-## Phase 0 — Architecture 🟡
+## Phase 0 — Architecture ✅
 
 **Goal:** establish the repo, tooling, documentation and decisions before writing services.
 
@@ -79,7 +79,7 @@ present, `/ready` OK). Provider simulators deferred to Phase 12.
 - [x] Invalid payloads rejected (400) and logged with correlationId.
 - [x] `/health`, `/ready`, `/metrics` present.
 - [x] `pnpm test` (gateway) green on host + E2E verified against live infra.
-- [ ] Provider simulators (deferred to Phase 12).
+- [x] Provider simulators (webchat runtime + WhatsApp fixtures; Phase 12).
 
 ---
 
@@ -189,21 +189,27 @@ auto-reply to billing team, `provider_requests_total{success}=2`, `message.sent`
 
 ---
 
-## Phase 9 — Analytics ⬜
+## Phase 9 — Analytics ✅
 
 **Goal:** business + technical metrics from the event stream.
 
 **Deliverables:** event consumers computing messages/channel, conversations/hour, response/resolution times,
 AI containment, handoff rate, error rate, provider latency; separated business vs technical metrics; dashboards.
 
+**Status:** Implemented and verified. Consumes `cxorbit.events.>`, `/summary` + Prometheus metrics, JetStream
+lag gauges, Grafana **CX-ORBIT Business Analytics**, Prometheus host scrape. **3/3 unit tests**; live
+verified (`messagesInbound=13`, `aiContainmentRate=1`, `handoffRate=0.125`, `deliverySuccessRate=1`,
+`consumer_lag=0`, Prometheus scraping `host.docker.internal:8086`).
+
 **Acceptance criteria**
-- [ ] Metrics update as events flow.
-- [ ] Grafana dashboards render technical + business panels.
-- [ ] Consumer keeps up under normal load; lag is observable.
+- [x] Metrics update as events flow.
+- [x] Grafana dashboards render technical + business panels.
+- [x] Consumer keeps up under normal load; lag is observable.
+- [x] Verified on host (typecheck/tests/E2E).
 
 ---
 
-## Phase 10 — Incident Simulator ⬜
+## Phase 10 — Incident Simulator ✅
 
 **Goal:** inject controlled, observable failures.
 
@@ -212,13 +218,13 @@ queue backlog, database latency, AI invalid response, event loss); each modifies
 metrics, logs; can be disabled.
 
 **Acceptance criteria**
-- [ ] Each incident is triggerable and produces the documented symptoms.
-- [ ] Each incident is diagnosable via metrics/logs and can be stopped.
-- [ ] Each has before/after behavior and a regression test.
+- [x] Each incident is triggerable and produces the documented symptoms.
+- [x] Each incident is diagnosable via metrics/logs and can be stopped.
+- [x] Each has before/after behavior and a regression test.
 
 ---
 
-## Phase 11 — Frontend ⬜
+## Phase 11 — Frontend ✅
 
 **Goal:** a functional operator console consuming real APIs.
 
@@ -226,13 +232,13 @@ metrics, logs; can be disabled.
 (start/stop/details), Observability dashboard; React + Vite + Router + TanStack Query + Zustand + Recharts + Tailwind.
 
 **Acceptance criteria**
-- [ ] Dashboard shows live metrics from services.
-- [ ] Can view a conversation with its AI analysis and routing.
-- [ ] Can start/stop an incident and see the effect.
+- [x] Dashboard shows live metrics from services.
+- [x] Can view a conversation with its AI analysis and routing.
+- [x] Can start/stop an incident and see the effect.
 
 ---
 
-## Phase 12 — Testing ⬜
+## Phase 12 — Testing ✅
 
 **Goal:** confidence across the tiers.
 
@@ -240,13 +246,15 @@ metrics, logs; can be disabled.
 (Mongo/Postgres/Redis/bus), contract (adapters, simulators, events), e2e (full WhatsApp flow), failure tests.
 
 **Acceptance criteria**
-- [ ] `pnpm test` green locally.
-- [ ] e2e simulates a WhatsApp message end-to-end through analytics.
-- [ ] Failure tests cover duplicate/timeout/invalid AI/DB failure/event retry.
+- [x] `pnpm test` green locally.
+- [x] e2e simulates a WhatsApp message end-to-end through analytics.
+- [x] Failure tests cover duplicate/timeout/invalid AI/DB failure/event retry.
+
+See [testing.md](./testing.md) for tiers and opt-in flags (`RUN_INTEGRATION`, `RUN_E2E`).
 
 ---
 
-## Phase 13 — CI/CD ⬜
+## Phase 13 — CI/CD ✅
 
 **Goal:** automated quality gates.
 
@@ -254,12 +262,14 @@ metrics, logs; can be disabled.
 optional security scan + dependency audit.
 
 **Acceptance criteria**
-- [ ] Pipeline fails on lint/typecheck/critical test/build failure.
-- [ ] Docker images build in CI.
+- [x] Pipeline fails on lint/typecheck/critical test/build failure.
+- [x] Docker images build in CI.
+
+Workflow: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). Local: `bash scripts/docker-build-all.sh`.
 
 ---
 
-## Phase 14 — Final Documentation ⬜
+## Phase 14 — Final Documentation ✅
 
 **Goal:** the portfolio-grade story.
 
@@ -267,6 +277,9 @@ optional security scan + dependency audit.
 interview walkthrough.
 
 **Acceptance criteria**
-- [ ] Every incident has a runbook + postmortem.
-- [ ] `docker compose up` + documented test command reproduce the full success checklist in the README.
-- [ ] Interview walkthrough explains each decision, observable, test and incident.
+- [x] Every incident has a runbook + postmortem.
+- [x] `docker compose up` + documented test command reproduce the full success checklist in the README.
+- [x] Interview walkthrough explains each decision, observable, test and incident.
+
+Walkthrough: [`docs/interview/walkthrough.md`](../interview/walkthrough.md).
+

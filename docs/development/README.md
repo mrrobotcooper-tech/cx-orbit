@@ -26,8 +26,12 @@ cp .env.example .env
 | `pnpm lint` | ESLint across the monorepo |
 | `pnpm typecheck` | TypeScript project references typecheck |
 | `pnpm format` / `pnpm format:check` | Prettier |
-| `pnpm test` | All tests (Vitest) |
-| `pnpm test:unit` / `:integration` / `:e2e` | Test tiers |
+| `pnpm test` | All tests (Vitest); IT/e2e skipped unless flagged |
+| `pnpm test:unit` / `:integration` / `:e2e` | Test tiers — see [testing.md](./testing.md) |
+| `pnpm checklist` | Smoke health + unit tests (services must be up) |
+| `pnpm docker:build` | Build all app Docker images locally |
+
+Interview narrative: [walkthrough](../interview/walkthrough.md).
 
 ## Repository conventions
 

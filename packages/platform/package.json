@@ -20,7 +20,8 @@
     "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc -p tsconfig.spec.json",
     "test": "vitest run",
-    "test:unit": "vitest run",
+    "test:unit": "vitest run --exclude '**/idempotency.integration.test.ts'",
+    "test:integration": "RUN_INTEGRATION=1 vitest run test/idempotency.integration.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

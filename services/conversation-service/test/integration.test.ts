@@ -1,6 +1,8 @@
 import {
   type EventBus,
+  type FaultStore,
   type MongoConnection,
+  FAULT_KEYS,
   connectEventBus,
   connectMongo,
   createLogger,
@@ -132,5 +134,76 @@ suite('conversation-service integration', () => {
     expect(publishedCount).toBe(pendingBefore);
     const pendingAfter = await collections.outbox.countDocuments({ status: 'pending' });
     expect(pendingAfter).toBe(0);
+  });
+
+  it('OUTBOX_DROP fault holds events until cleared (INC-006)', async () => {
+    const faults: FaultStore = {
+      async get(key) {
+        return key === FAULT_KEYS.OUTBOX_DROP ? '1' : null;
+      },
+      async set() {
+        /* noop */
+      },
+      async del() {
+        /* noop */
+      },
+      async clearAll() {
+        /* noop */
+      },
+    };
+    const service = newService();
+    const id = `wc_${Date.now()}_drop`;
+    await service.handleMessageReceived(messageReceived(id));
+
+    const relay = createOutboxRelay(
+      bus,
+      collections,
+      createConversationMetrics(new Registry()),
+      logger,
+      { faults },
+    );
+    expect(await relay.pump()).toBe(0);
+    expect(await collections.outbox.countDocuments({ status: 'pending' })).toBeGreaterThan(0);
+
+    // Cleared fault store → drain succeeds (event retry / recovery).
+    const healthy = createOutboxRelay(
+      bus,
+      collections,
+      createConversationMetrics(new Registry()),
+      logger,
+    );
+    expect(await healthy.pump()).toBeGreaterThan(0);
+    await relay.stop();
+    await healthy.stop();
+  });
+
+  it('DATABASE_LATENCY fault slows message handling (INC-004)', async () => {
+    const faults: FaultStore = {
+      async get(key) {
+        return key === FAULT_KEYS.DB_LATENCY_MS ? '80' : null;
+      },
+      async set() {
+        /* noop */
+      },
+      async del() {
+        /* noop */
+      },
+      async clearAll() {
+        /* noop */
+      },
+    };
+    const service = createConversationService({
+      client: mongo.client,
+      collections,
+      metrics: createConversationMetrics(new Registry()),
+      logger,
+      faults,
+    });
+    const id = `wc_${Date.now()}_lat`;
+    const started = Date.now();
+    const result = await service.handleMessageReceived(messageReceived(id));
+    const elapsed = Date.now() - started;
+    expect(result.status).toBe('processed');
+    expect(elapsed).toBeGreaterThanOrEqual(70);
   });
 });

@@ -1,8 +1,10 @@
 import {
   connectEventBus,
   connectMongo,
+  createFaultStore,
   createLogger,
   createMetrics,
+  createRedis,
   loadEnv,
 } from '@cx-orbit/platform';
 import { buildApp } from './app.js';
@@ -26,11 +28,14 @@ async function main(): Promise<void> {
   await ensureIndexes(collections);
   logger.info('mongo connected and indexes ensured');
 
+  const redis = createRedis({ url: config.REDIS_URL });
+  const faults = createFaultStore(redis);
   const eventBus = await connectEventBus({ url: config.NATS_URL, streamName: config.NATS_STREAM });
 
   const relay = createOutboxRelay(eventBus, collections, domainMetrics, logger, {
     pollIntervalMs: config.OUTBOX_POLL_INTERVAL_MS,
     batchSize: config.OUTBOX_BATCH_SIZE,
+    faults,
   });
 
   const service = createConversationService({
@@ -38,6 +43,7 @@ async function main(): Promise<void> {
     collections,
     metrics: domainMetrics,
     logger,
+    faults,
     notifyOutbox: () => {
       void relay.pump();
     },
@@ -83,6 +89,7 @@ async function main(): Promise<void> {
       await relay.stop();
       await app.close();
       await eventBus.close();
+      redis.disconnect();
       await mongo.close();
     } catch (err) {
       logger.error({ err }, 'error during shutdown');

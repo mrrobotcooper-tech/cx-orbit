@@ -1,12 +1,14 @@
 import {
   connectEventBus,
+  createFaultStore,
   createIdempotencyStore,
   createLogger,
   createMetrics,
   createRedis,
+  FAULT_KEYS,
   loadEnv,
 } from '@cx-orbit/platform';
-import { createOutboundAdapters } from './adapters/index.js';
+import { createOutboundAdapters, type WebChatSimulateFault } from './adapters/index.js';
 import { buildApp } from './app.js';
 import { envSchema } from './config.js';
 import { startConsumers } from './consumers/index.js';
@@ -16,6 +18,8 @@ import { createDeliveryService } from './service/delivery-service.js';
 
 const SERVICE = 'outbound-service';
 
+const WEBCHAT_FAULTS = new Set<WebChatSimulateFault>(['none', 'timeout', 'error', 'rate_limit']);
+
 async function main(): Promise<void> {
   const config = loadEnv(envSchema);
   const logger = createLogger({ service: SERVICE, level: config.LOG_LEVEL });
@@ -23,6 +27,7 @@ async function main(): Promise<void> {
   const domainMetrics = createOutboundMetrics(metrics.registry);
 
   const redis = createRedis({ url: config.REDIS_URL });
+  const faults = createFaultStore(redis);
   const idempotency = createIdempotencyStore(redis, {
     defaultTtlSeconds: config.IDEMPOTENCY_TTL_SECONDS,
   });
@@ -33,6 +38,13 @@ async function main(): Promise<void> {
     webchat: {
       baseUrl: config.WEBCHAT_PROVIDER_URL,
       simulateFault: config.WEBCHAT_SIMULATE_FAULT,
+      getSimulateFault: async () => {
+        const raw = await faults.get(FAULT_KEYS.WEBCHAT_SIMULATE);
+        if (raw && WEBCHAT_FAULTS.has(raw as WebChatSimulateFault)) {
+          return raw as WebChatSimulateFault;
+        }
+        return 'none';
+      },
     },
   });
 

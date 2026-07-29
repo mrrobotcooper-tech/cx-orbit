@@ -24,6 +24,15 @@ describe('MockAIProvider (happy path)', () => {
 });
 
 describe('MockAIProvider failure modes', () => {
+  it('getForceFailure overrides static NONE with INVALID_JSON', async () => {
+    const provider = createMockAIProvider({
+      forceFailure: 'NONE',
+      getForceFailure: async () => 'INVALID_JSON' as const,
+    });
+    const result = await provider.classifyIntent('hola');
+    expect(result.confidence).toBe(2);
+  });
+
   it('TIMEOUT throws AIProviderError', async () => {
     const provider = createMockAIProvider({ forceFailure: 'TIMEOUT', timeoutDelayMs: 5 });
     await expect(provider.classifyIntent('hola')).rejects.toMatchObject({

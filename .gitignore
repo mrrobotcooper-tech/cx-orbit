@@ -18,6 +18,10 @@ coverage/
 *.pem
 *.key
 
+# Local-only manuals (not part of the repo history)
+INSTRUCTIVO-USO-LOCAL.md
+*.local.md
+
 # Logs
 logs/
 *.log

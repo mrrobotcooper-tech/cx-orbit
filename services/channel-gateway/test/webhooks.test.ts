@@ -92,6 +92,39 @@ describe('POST /webhooks/:channel', () => {
     expect(res.json().correlationId).toBe('corr_fixed');
     expect(publisher.published[0]?.correlationId).toBe('corr_fixed');
   });
+
+  it('accepts a WhatsApp Cloud API webhook', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/whatsapp',
+      payload: {
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  contacts: [{ profile: { name: 'Ana' }, wa_id: '5491112345678' }],
+                  messages: [
+                    {
+                      from: '5491112345678',
+                      id: 'wamid.gateway_unit',
+                      type: 'text',
+                      text: { body: 'hola wa' },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(res.statusCode).toBe(202);
+    expect(publisher.published[0]?.payload).toMatchObject({
+      channel: 'whatsapp',
+      externalMessageId: 'wamid.gateway_unit',
+    });
+  });
 });
 
 describe('POST /webhooks/:channel with webhook secret', () => {
